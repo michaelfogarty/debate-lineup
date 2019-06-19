@@ -15,51 +15,18 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 library(tidyverse)  ## general data manipulation
 library(rvest)      ## web scraping
-library(coin)       ## permutation test
-library(knitr)      ## kable function
-library(kableExtra) ## make it pretty
+library(randomizr)  ## block random assignment
+library(knitr)
+library(kableExtra)
+library(assertthat)
 
 ```
 
 ```{r read_data}
-## Read in data -- scrape from 538
 
-#Specifying the url for desired website to be scraped
-url <- 'https://fivethirtyeight.com/features/the-dnc-tried-to-avoid-a-lopsided-debate-it-got-one-anyway/'
+debates <- read_rds('debates.RDS')
 
-#Reading the HTML code from the website
-webpage <- read_html(url)
-
-scrape <- 
-webpage %>% 
-  html_nodes('#post-213083 > div > section > table') %>% 
-  html_table() %>% 
-  magrittr::extract2(1) %>% 
-  janitor::clean_names() %>% 
-  slice(1:10) %>% 
-  mutate(avg = as.numeric(str_remove(avg, '%')),
-         avg_2 = as.numeric(str_remove(avg_2, '%')))
-
-## process the data - combine 2 columns into 1
-
-night_1 <- 
-scrape %>% select(june_26_debate, no_of_polls, avg) %>% 
-  mutate(night = 'June 26') %>% 
-  rename(candidate = june_26_debate)
-
-night_2 <- 
-  scrape %>% select(june_27_debate, no_of_polls, avg_2) %>% 
-  mutate(night = 'June 27') %>% 
-  rename(candidate = june_27_debate, avg = avg_2)
-
-debates <- 
-  bind_rows(night_1, night_2) %>% 
-  mutate(night = as_factor(night))
-
-rm(night_1, night_2, scrape, webpage, url)
-
-simulated_data <- 
-read_rds('/Users/michaelfogarty/Local Files/Other/Coding/R/R Practice/permutation_simulation_results.RDS')
+simulated_data <- read_rds('permutation_simulation_results.RDS')
 
 ```
 
@@ -104,30 +71,55 @@ News analysis and commentators have called attention to the apparent imbalance b
 
 On the surface, it seems like there is a pretty big difference in the polling averages of the candidates on the first and second nights. The mean polling average for the candidates on the first night is `r debates %>% filter(night == 'June 26') %>%  summarize(mean(avg))`%, while the mean for the second night is `r debates %>% filter(night == 'June 27') %>%  summarize(mean(avg))`%. The total polling average (the sum of all of the candidates' averages for each night) also appear quite different: `r debates %>% filter(night == 'June 26') %>%  summarize(sum(avg))`% for the first night versus `r debates %>% filter(night == 'June 27') %>%  summarize(sum(avg))`% for the second.
 
-However, the important question isn't whether or not this difference appears large or small out of context, but whether it is truly out of the range that we would expect given the random assignment of candidates to the two debates. To assess this, I used [permutation inference](https://thomasleeper.com/Rcourse/Tutorials/permutationtests.html), a statistical technique that builds the underlying distribution of possible debate lineups through simulation, then compared the actual outcome to the distribution of possible outcomes. Permutation tests are attractive because they don't make any assumptions about the underlying structure of the data and do not restrict the test statistic to a difference in means.
+However, the important question isn't whether or not this difference appears large or small out of context, but whether it is truly out of the range that we would expect given the random assignment of candidates to the two debates. To assess this, I used [permutation inference](https://thomasleeper.com/Rcourse/Tutorials/permutationtests.html), a statistical technique that builds the underlying distribution of possible debate lineups through simulation, then compared the actual outcome to the distribution of possible outcomes. Permutation tests are attractive because they don't make any assumptions about the underlying structure of the data and don't restrict the test statistic.
 
-To measure how skewed the debate lineup is, I decided to focus on the difference in total polling average across the two nights (a similar analysis could be conducted for differences in means or medians as well). I simulated 10,000 random debate lineups and calculated the difference in total polling average between the two nights for each simulated lineup. 
+To measure how skewed the debate lineup is, I decided to focus on the difference in total polling average across the two nights (a similar analysis could be conducted for differences in means or medians as well). I simulated 10,000 random debate lineups and calculated the difference in total polling average between the two nights for each simulated lineup. However, the DNC did not use a simple random assignment mechanism, but rather a blocked assignment, where the candidates were first split into two categories: those polling at or above 2% and those polling below 2%. The candidates were then randomly assigned to one of the two debate nights *within* their category.
 
 ```{r histogram, fig.align = 'center'}
+hist <- 
 ggplot(data = simulated_data, aes(x = dist)) + 
   geom_histogram(bins=100,  fill = 'gray30') +
   geom_vline(xintercept = permutation_stat, color = 'blue', size=1.5) +
   theme_bw() +
-  xlab('Difference in Total Polling Average') + ylab('Count')
+  xlab('Difference in Total Polling Average') + ylab('Count') +
+  ggtitle('Simple Random Assignment')
+
+hist_block <- ggplot(data = simulated_data, aes(x = block_dist)) + 
+  geom_histogram(bins=100,  fill = 'gray30') +
+  geom_vline(xintercept = permutation_stat, color = 'blue', size=1.5) +
+  theme_bw() +
+  xlab('Difference in Total Polling Average') + ylab('Count') +
+  ggtitle('Block Random Assignment')
+
+ggpubr::ggarrange(hist, hist_block, ncol=2)
 ```
+
+
 
 The blue bar in the graph above is the actual difference in total polling average across the two nights. Although the true difference of `r permutation_stat` is greater than the average difference of `r round(mean(simulated_data$dist),1)`, it is still well within the meat of the distribution of outcomes. Although this visual test gives us a good sense of the result, we can be more precise. Below, I've plotted the empirical cumulative distribution function of the simulation results. 
 
 ```{r ecdf plot, fig.align = 'center'}
+ecdf <- 
 ggplot(data = simulated_data, aes(x = dist)) +
   stat_ecdf(geom = "step", color = 'gray30', size = 2) +
   geom_vline(xintercept = permutation_stat, color = 'blue', size=1.5) +
   theme_bw() +
-  xlab('Difference in Total Polling Average') + ylab('')
+  xlab('Difference in Total Polling Average') + ylab('') +
+  ggtitle('Simple Random Assignment')
+
+ecdf_block <- 
+ggplot(data = simulated_data, aes(x = block_dist)) +
+  stat_ecdf(geom = "step", color = 'gray30', size = 2) +
+  geom_vline(xintercept = permutation_stat, color = 'blue', size=1.5) +
+  theme_bw() +
+  xlab('Difference in Total Polling Average') + ylab('') +
+  ggtitle('Block Random Assignment')
+
+ggpubr::ggarrange(ecdf, ecdf_block, ncol=2)
 ```
 
 ```{r ecdf}
-P <- ecdf(simulated_data$dist)
+P <- ecdf(simulated_data$block_dist)
 ```
 
 
