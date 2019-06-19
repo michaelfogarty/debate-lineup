@@ -74,7 +74,7 @@ permutation_stat <-
 
 ## The Debate Lineups
 
-Last Friday, the DNC released the lineups for the first two Democratic debates, June 26 and 27th. To avoid the backlash that followed the Republican primary debates in 2015 when the RNC divided candidates into a top-tier and JV debate, the DNC decided to randomize the lineups for the two nights.
+Last Friday, the DNC released the lineups for the first two Democratic debates on June 26 and 27th. To avoid the backlash that followed the Republican primary debates in 2015 when the RNC divided its candidates into a top-tier and JV debate, the DNC decided to randomize the lineups for the two nights.
 
 ```{r lineup night 1}
 debates %>% 
@@ -86,7 +86,7 @@ debates %>%
                 full_width = F)
 ```
 
-Elizabeth Warren stands out as the lone "top-tier" candidate on the first night (although a case could be made for Beto O'Rourke as well), while the second debate is comparatively stacked with Joe Biden, Bernie Sanders, Kamala Harris and Pete Buttigieg.
+Elizabeth Warren stands out as the lone "top-tier" candidate on the first night (although a case could be made for Beto O'Rourke's status as a major contender as well), while the second debate is comparatively stacked with Joe Biden, Bernie Sanders, Kamala Harris and Pete Buttigieg.
 
 ```{r lineup night 2}
 debates %>% 
@@ -98,13 +98,13 @@ debates %>%
                 full_width = F)
 ```
 
-News analysis and commentators have called attention to the apparent imbalance between the two nights. Nathaniel Rakich and Geoffrey Skelley at FiveThirtyEight called the debate [lopsided](https://fivethirtyeight.com/features/the-dnc-tried-to-avoid-a-lopsided-debate-it-got-one-anyway/). I'm going to argue that, while the lineups certainly aren't balanced, that this result is well within the range of what we'd expect, given that the candidates are assigned randomly to the two debates.
+News analysis and commentators have called attention to the apparent imbalance between the two nights. Nathaniel Rakich and Geoffrey Skelley at FiveThirtyEight called the debate [lopsided](https://fivethirtyeight.com/features/the-dnc-tried-to-avoid-a-lopsided-debate-it-got-one-anyway/). I argue that, while the lineups certainly aren't balanced, that this result is well within the range of what we'd expect, given that the candidates are assigned randomly to the two debates.
 
 ## Just How Imbalanced is this Lineup?
 
 On the surface, it seems like there is a pretty big difference in the polling averages of the candidates on the first and second nights. The mean polling average for the candidates on the first night is `r debates %>% filter(night == 'June 26') %>%  summarize(mean(avg))`%, while the mean for the second night is `r debates %>% filter(night == 'June 27') %>%  summarize(mean(avg))`%. The total polling average (the sum of all of the candidates' averages for each night) also appear quite different: `r debates %>% filter(night == 'June 26') %>%  summarize(sum(avg))`% for the first night versus `r debates %>% filter(night == 'June 27') %>%  summarize(sum(avg))`% for the second.
 
-However, the importnat question isn't whether or not this difference appears large or small out of context, but whether it is truly out of the range we would expect given the random assignment of candidates to the two debates. To assess this, I used [permutation inference](https://thomasleeper.com/Rcourse/Tutorials/permutationtests.html), a statistical technique where I built the underlying distribution of possible debate lineups through simulation, then compared the actual outcome to the distribution of possible outcomes I built. Permutation tests are attractive because they don't make any assumptions about the underlying structure of the data and *allow the testing of any test statistic you can think to calculate.* (Help here -- I don't like how that clause sounds)
+However, the important question isn't whether or not this difference appears large or small out of context, but whether it is truly out of the range that we would expect given the random assignment of candidates to the two debates. To assess this, I used [permutation inference](https://thomasleeper.com/Rcourse/Tutorials/permutationtests.html), a statistical technique that builds the underlying distribution of possible debate lineups through simulation, then compared the actual outcome to the distribution of possible outcomes. Permutation tests are attractive because they don't make any assumptions about the underlying structure of the data and do not restrict the test statistic to a difference in means.
 
 To measure how skewed the debate lineup is, I decided to focus on the difference in total polling average across the two nights (a similar analysis could be conducted for differences in means or medians as well). I simulated 10,000 random debate lineups and calculated the difference in total polling average between the two nights for each simulated lineup. 
 
@@ -116,7 +116,7 @@ ggplot(data = simulated_data, aes(x = dist)) +
   xlab('Difference in Total Polling Average') + ylab('Count')
 ```
 
-The blue bar in the graph above is the actual difference in total polling average across the two nights. Although the true difference of `r permutation_stat` is above the average difference of `r mean(simulated_data$dist)`, it is still well within the meat of the distribution of outcomes. Although this visual test gives us a good sense of the result, we can be more precise. Below, I've plotted the empirical cumulative distribution function of the simulation results. 
+The blue bar in the graph above is the actual difference in total polling average across the two nights. Although the true difference of `r permutation_stat` is greater than the average difference of `r round(mean(simulated_data$dist),1)`, it is still well within the meat of the distribution of outcomes. Although this visual test gives us a good sense of the result, we can be more precise. Below, I've plotted the empirical cumulative distribution function of the simulation results. 
 
 ```{r ecdf plot, fig.align = 'center'}
 ggplot(data = simulated_data, aes(x = dist)) +
@@ -131,5 +131,5 @@ P <- ecdf(simulated_data$dist)
 ```
 
 
-We'd expect to see a result at least as extreme as the true lineups `r round((1-P(permutation_stat))*100, 1)`% of the time. It's unfair to call an outcome that happens 1/4 of the time unbalanced or lopsided, but the media's reaction to the apparent disparity fits with our [well-known inability to accurately perceive and assess randomness](https://www.sciencedirect.com/science/article/pii/019688589190029I). Humans have a tendancy to expect small samples to be representative of the global patterns.
+We'd expect to see a result at least as extreme as the true lineups `r round((1-P(permutation_stat))*100, 1)`% of the time. It's unfair to call an outcome that happens one out of four times unbalanced or lopsided, but the media's reaction to the apparent disparity fits with our [well-known inability to accurately perceive and assess randomness](https://www.sciencedirect.com/science/article/pii/019688589190029I). Humans have a tendency to expect small samples to be representative of the true patterns or frequencies.
 
